@@ -1,10 +1,50 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8" />
-    <title>Název</title>
-</head>
-<body>
-    
-</body>
-</html>
+import msal
+from flask import Flask, redirect, url_for, session, request
+
+# Nastavení aplikace
+CLIENT_ID = 'TVŮJ_CLIENT_ID'  # Nahraď svým Client ID
+CLIENT_SECRET = 'TVŮJ_CLIENT_SECRET'  # Nahraď svým Client Secret
+AUTHORITY = "https://login.microsoftonline.com/TENANT_ID"  # Nahraď tvým Tenant ID
+REDIRECT_URI = "http://localhost:8000/getAToken"  # URI pro přesměrování
+
+# Inicializace aplikace
+app = Flask(__name__)
+app.secret_key = 'nějaké tajemství'  # Nahraď vlastním tajemstvím
+
+msal_app = msal.ConfidentialClientApplication(
+    CLIENT_ID, authority=AUTHORITY,
+    client_credential=CLIENT_SECRET
+)
+
+@app.route('/')
+def index():
+    return '<a href="/login">Přihlásit se přes Microsoft</a>'
+
+@app.route('/login')
+def login():
+    auth_url = msal_app.get_authorization_request_url(
+        scopes=["User.Read"],  # Scopes pro data, ke kterým potřebuješ přístup
+        redirect_uri=REDIRECT_URI
+    )
+    return redirect(auth_url)
+
+@app.route('/getAToken')
+def authorized():
+    code = request.args.get('code')
+    if not code:
+        return "Přihlašování se nezdařilo"
+
+    token = msal_app.acquire_token_by_authorization_code(
+        code,
+        scopes=["User.Read"],
+        redirect_uri=REDIRECT_URI
+    )
+
+    if "access_token" in token:
+        session["user"] = token
+        return "Přihlášení bylo úspěšné!"
+    else:
+        return "Přihlašování se nezdařilo"
+
+if __name__ == '__main__':
+    app.run(port=8000)
